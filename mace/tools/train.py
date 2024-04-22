@@ -201,6 +201,19 @@ def train(
             param_context = (
                 ema.average_parameters() if ema is not None else nullcontext()
             )
+
+            #change
+            # Checking gradients in the active layers
+            test_freeze = True
+            if test_freeze == True:
+                logging.info("Check gradients")
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+                        gradient_norm = torch.norm(param.grad).item()
+                        logging.info(f"Parameter: {name}, Gradient norm: {gradient_norm}")
+                    else:
+                        logging.info(f"Parameter: {name}, Gradient norm: Frozen")
+
             with param_context:
                 valid_loss, eval_metrics = evaluate(
                     model=model_to_evaluate,
@@ -345,8 +358,9 @@ def evaluate(
     output_args: Dict[str, bool],
     device: torch.device,
 ) -> Tuple[float, Dict[str, Any]]:
-    for param in model.parameters():
-        param.requires_grad = False
+   # change
+   # for param in model.parameters():
+   #     param.requires_grad = False
 
     metrics = MACELoss(loss_fn=loss_fn).to(device)
 
@@ -367,8 +381,9 @@ def evaluate(
     aux["time"] = time.time() - start_time
     metrics.reset()
 
-    for param in model.parameters():
-        param.requires_grad = True
+    # change
+    #for param in model.parameters():
+    #    param.requires_grad = True
 
     return avg_loss, aux
 

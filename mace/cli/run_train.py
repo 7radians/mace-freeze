@@ -504,6 +504,44 @@ def main() -> None:
             load_readout=True,
             max_L=args.max_L,
         )
+
+
+    #change: freeze all layers except the readouts
+    #for name, param in model.named_parameters():
+    #     if "readouts" in name:
+    #         param.requires_grad = True
+    #     else:
+    #         param.requires_grad = False
+
+    #change
+    # Freeze layers 
+    # Default: freeze all layers before the last one before "readouts"
+    # change to 12345
+    if args.freeze == 12345: 
+        last_frozen_index = -1
+        first_layer_name = None
+        for name, param in model.named_parameters():
+            if 'readouts' in name:
+                break
+            last_frozen_index += 1
+            first_layer_name = name
+    else: 
+        last_frozen_index = args.freeze 
+        first_layer_name = None
+        for idx, (name, param) in enumerate(model.named_parameters()):
+            if idx > last_frozen_index:
+                break
+            first_layer_name = name
+
+    logging.info(f"N of frozen layers: {last_frozen_index}")
+    logging.info(f"First active layer: {first_layer_name}")
+
+    for idx, (name, param) in enumerate(model.named_parameters()):
+        if idx < last_frozen_index:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+
     model.to(device)
 
     # Optimizer
@@ -547,6 +585,13 @@ def main() -> None:
         amsgrad=args.amsgrad,
     )
 
+    #change: log gradients to check that only the last layer is updating gradients
+
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            logging.info(f"Parameter: {name}, Active layer")
+        else:
+            logging.info(f"Parameter: {name}, Frozen layer")
     optimizer: torch.optim.Optimizer
     if args.optimizer == "adamw":
         optimizer = torch.optim.AdamW(**param_options)

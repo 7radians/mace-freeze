@@ -604,6 +604,13 @@ def build_default_arg_parser() -> argparse.ArgumentParser:
             "forces_weight",
         ],
     )
+    # change: add freeze
+    parser.add_argument(
+        "--freeze",
+        help="Freeze layers from 1 to N. 0 means all layers are active. Default: all frozen except readouts and 1 before readouts",
+        type=int,
+        default="12345",
+    )
     return parser
 
 
@@ -739,6 +746,13 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         help="Random seed for splitting training and validation sets",
         type=int,
         default=123,
+    )
+    # change: add freeze
+    parser.add_argument(
+        "--freeze",
+        help="Freeze layers from 1 to N. 0 means all layers are active. Default: all frozen except readouts and 1 before readouts",
+        type=int,
+        default="12345",
     )
     return parser
 
