@@ -505,43 +505,50 @@ def main() -> None:
             max_L=args.max_L,
         )
 
-
-    #change: freeze all layers except the readouts
-    #for name, param in model.named_parameters():
-    #     if "readouts" in name:
-    #         param.requires_grad = True
-    #     else:
-    #         param.requires_grad = False
-
-    #change
-    # Freeze layers 
-    # Default: freeze all layers before the last one before "readouts"
-    # change to 12345
-    if args.freeze == 12345: 
-        last_frozen_index = -1
-        first_layer_name = None
-        for name, param in model.named_parameters():
-            if 'readouts' in name:
-                break
-            last_frozen_index += 1
-            first_layer_name = name
-    else: 
-        last_frozen_index = args.freeze 
-        first_layer_name = None
-        for idx, (name, param) in enumerate(model.named_parameters()):
-            if idx > last_frozen_index:
-                break
-            first_layer_name = name
-
-    logging.info(f"N of frozen layers: {last_frozen_index}")
-    logging.info(f"First active layer: {first_layer_name}")
-
-    for idx, (name, param) in enumerate(model.named_parameters()):
-        if idx < last_frozen_index:
-            param.requires_grad = False
+    # change: freeze layers
+    def freeze_layers(model, n):
+        layers = list(model.children())
+        num_layers = len(layers)
+        logging.info(f"N of model layers: {num_layers}")
+        if n < 0:
+            frozen_layers = layers[n:]
         else:
-            param.requires_grad = True
+            frozen_layers = layers[:n]
 
+        logging.info(f"N of frozen layers: {len(frozen_layers)}")
+
+        for layer in frozen_layers:
+            for param in layer.parameters():
+                param.requires_grad = False
+
+    # or freeze parameter tensors 
+    def freeze_param(model, n):
+        par_ten = list(model.named_parameters())
+        num_par = len(par_ten)
+        logging.info(f"N of named parameters: {num_par}")
+        if n < 0: 
+            index = n + num_par - 1
+            for idx, (name, param) in enumerate(model.named_parameters()):
+                if idx > index:
+                     param.requires_grad = False
+                else:
+                    param.requires_grad = True     
+        else: 
+            index = n - 1
+            for idx, (name, param) in enumerate(model.named_parameters()):
+                if idx > index:
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+
+    if args.freeze_par is not None:
+        freeze_param(model, args.freeze_par)
+    elif args.freeze is not None:
+        freeze_layers(model, args.freeze)
+    if (args.freeze is not None) and (args.freeze_par is not None):
+        logging.info(f"both --freeze and --freeze_par arguments detected, using --freeze")
+        freeze_layers(model, args.freeze)
+        
     model.to(device)
 
     # Optimizer
@@ -585,13 +592,13 @@ def main() -> None:
         amsgrad=args.amsgrad,
     )
 
-    #change: log gradients to check that only the last layer is updating gradients
-
+    #change: log parameter tensor to check the layers are frozen
     for name, param in model.named_parameters():
         if param.requires_grad:
-            logging.info(f"Parameter: {name}, Active layer")
+            logging.info(f"Parameter: {name}, Active")
         else:
-            logging.info(f"Parameter: {name}, Frozen layer")
+            logging.info(f"Parameter: {name}, Frozen")
+
     optimizer: torch.optim.Optimizer
     if args.optimizer == "adamw":
         optimizer = torch.optim.AdamW(**param_options)
