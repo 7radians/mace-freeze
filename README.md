@@ -354,7 +354,7 @@ For finer tuning, parameter tensors can be frozen in each layer. The log file wi
 To freeze these parameters, use:
 
 ```sh
---freeze_par=6 \
+--freeze_par=6 
 ```
 --freeze_par takes integer values and works in the same manner as --freeze, freezing from 1 to N (if positive) or the last N (if negative).
 
