@@ -753,12 +753,18 @@ def build_preprocess_arg_parser() -> argparse.ArgumentParser:
         type=int,
         default=123,
     )
-    # change: add freeze
+     # change: add freeze
     parser.add_argument(
         "--freeze",
-        help="Freeze layers from 1 to N. 0 means all layers are active. Default: all frozen except readouts and 1 before readouts",
+        help="Freeze layers from 1 to N. Can be positive or negative, e.g. -1 means the last layer is frozen. 0 or None means all layers are active and is a default setting",
         type=int,
-        default="12345",
+        default=None,
+    )
+    parser.add_argument(
+        "--freeze_par",
+        help="Freeze named parameters from 1 to N. Can be positive or negative, e.g. -1 means the last layer is frozen. 0 means all layers are active and is a default setting",
+        type=int,
+        default=None,
     )
     return parser
 
