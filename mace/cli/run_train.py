@@ -9,6 +9,7 @@ import glob
 import json
 import logging
 import os
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional
 
@@ -16,6 +17,7 @@ import numpy as np
 import torch.distributed
 import torch.nn.functional
 from e3nn import o3
+from e3nn.util import jit
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.swa_utils import SWALR, AveragedModel
 from torch_ema import ExponentialMovingAverage
@@ -24,16 +26,20 @@ import mace
 from mace import data, modules, tools
 from mace.calculators.foundations_models import mace_mp, mace_off
 from mace.tools import torch_geometric
+from mace.tools.finetuning_utils import load_foundations
 from mace.tools.scripts_utils import (
     LRScheduler,
+    convert_to_json_format,
     create_error_table,
+    extract_config_mace_model,
     get_atomic_energies,
     get_config_type_weights,
     get_dataset_from_xyz,
     get_files_with_suffix,
+    print_git_commit,
 )
 from mace.tools.slurm_distributed import DistributedEnvironment
-from mace.tools.finetuning_utils import load_foundations, extract_config_mace_model
+from mace.tools.utils import AtomicNumberTable
 
 
 def main() -> None:
@@ -71,7 +77,7 @@ def main() -> None:
 
     tools.set_default_dtype(args.default_dtype)
     device = tools.init_device(args.device)
-
+    commit = print_git_commit()
     if args.foundation_model is not None:
         if args.foundation_model in ["small", "medium", "large"]:
             logging.info(
@@ -167,12 +173,25 @@ def main() -> None:
     logging.info(z_table)
 
     if atomic_energies_dict is None or len(atomic_energies_dict) == 0:
-        if args.train_file.endswith(".xyz"):
-            atomic_energies_dict = get_atomic_energies(
-                args.E0s, collections.train, z_table
+        if args.E0s.lower() == "foundation":
+            assert args.foundation_model is not None
+            logging.info("Using atomic energies from foundation model")
+            z_table_foundation = AtomicNumberTable(
+                [int(z) for z in model_foundation.atomic_numbers]
             )
+            atomic_energies_dict = {
+                z: model_foundation.atomic_energies_fn.atomic_energies[
+                    z_table_foundation.z_to_index(z)
+                ].item()
+                for z in z_table.zs
+            }
         else:
-            atomic_energies_dict = get_atomic_energies(args.E0s, None, z_table)
+            if args.train_file.endswith(".xyz"):
+                atomic_energies_dict = get_atomic_energies(
+                    args.E0s, collections.train, z_table
+                )
+            else:
+                atomic_energies_dict = get_atomic_energies(args.E0s, None, z_table)
 
     if args.model == "AtomicDipolesMACE":
         atomic_energies = None
@@ -193,30 +212,6 @@ def main() -> None:
         else:
             compute_energy = True
             compute_dipole = False
-        if atomic_energies_dict is None or len(atomic_energies_dict) == 0:
-            if args.E0s is not None:
-                logging.info(
-                    "Atomic Energies not in training file, using command line argument E0s"
-                )
-                if args.E0s.lower() == "average":
-                    logging.info(
-                        "Computing average Atomic Energies using least squares regression"
-                    )
-                    atomic_energies_dict = data.compute_average_E0s(
-                        collections.train, z_table
-                    )
-                else:
-                    try:
-                        atomic_energies_dict = ast.literal_eval(args.E0s)
-                        assert isinstance(atomic_energies_dict, dict)
-                    except Exception as e:
-                        raise RuntimeError(
-                            f"E0s specified invalidly, error {e} occurred"
-                        ) from e
-            else:
-                raise RuntimeError(
-                    "E0s not found in training file and not specified in command line"
-                )
         atomic_energies: np.ndarray = np.array(
             [atomic_energies_dict[z] for z in z_table.zs]
         )
@@ -370,13 +365,19 @@ def main() -> None:
             train_loader, atomic_energies
         )
     # Build model
-    if args.foundation_model is not None:
+    if args.foundation_model is not None and args.model in ["MACE", "ScaleShiftMACE"]:
         logging.info("Building model")
-        model_config = extract_config_mace_model(model_foundation)
-        model_config["atomic_energies"] = atomic_energies
-        model_config["atomic_numbers"] = z_table.zs
-        model_config["num_elements"] = len(z_table)
-        args.max_L = model_config["hidden_irreps"].lmax
+        model_config_foundation = extract_config_mace_model(model_foundation)
+        model_config_foundation["atomic_numbers"] = z_table.zs
+        model_config_foundation["num_elements"] = len(z_table)
+        args.max_L = model_config_foundation["hidden_irreps"].lmax
+        model_config_foundation["atomic_inter_shift"] = (
+            model_foundation.scale_shift.shift.item()
+        )
+        model_config_foundation["atomic_inter_scale"] = (
+            model_foundation.scale_shift.scale.item()
+        )
+        model_config_foundation["atomic_energies"] = atomic_energies
         args.model = "FoundationMACE"
     else:
         logging.info("Building model")
@@ -442,7 +443,7 @@ def main() -> None:
             radial_type=args.radial_type,
         )
     elif args.model == "FoundationMACE":
-        model = modules.ScaleShiftMACE(**model_config)
+        model = modules.ScaleShiftMACE(**model_config_foundation)
     elif args.model == "ScaleShiftBOTNet":
         model = modules.ScaleShiftBOTNet(
             **model_config,
@@ -615,15 +616,13 @@ def main() -> None:
         assert dipole_only is False, "swa for dipole fitting not implemented"
         swas.append(True)
         if args.start_swa is None:
-            args.start_swa = (
-                args.max_num_epochs // 4 * 3
-            )  # if not set start swa at 75% of training
+            args.start_swa = max(1, args.max_num_epochs // 4 * 3)
         else:
             if args.start_swa > args.max_num_epochs:
                 logging.info(
                     f"Start swa must be less than max_num_epochs, got {args.start_swa} > {args.max_num_epochs}"
                 )
-                args.start_swa = args.max_num_epochs // 4 * 3
+                args.start_swa = max(1, args.max_num_epochs // 4 * 3)
                 logging.info(f"Setting start swa to {args.start_swa}")
         if args.loss == "forces_only":
             logging.info("Can not select swa with forces only loss.")
@@ -794,7 +793,7 @@ def main() -> None:
             )
         try:
             drop_last = test_set.drop_last
-        except AttributeError as e:
+        except AttributeError as e:  # pylint: disable=W0612
             drop_last = False
         test_loader = torch_geometric.dataloader.DataLoader(
             test_set,
@@ -842,11 +841,42 @@ def main() -> None:
             if args.save_cpu:
                 model = model.to("cpu")
             torch.save(model, model_path)
-
+            extra_files = {
+                "commit.txt": commit.encode("utf-8"),
+                "config.yaml": json.dumps(
+                    convert_to_json_format(extract_config_mace_model(model))
+                ),
+            }
             if swa_eval:
                 torch.save(model, Path(args.model_dir) / (args.name + "_swa.model"))
+                try:
+                    path_complied = Path(args.model_dir) / (
+                        args.name + "_swa_compiled.model"
+                    )
+                    logging.info(f"Compiling model, saving metadata {path_complied}")
+                    model_compiled = jit.compile(deepcopy(model))
+                    torch.jit.save(
+                        model_compiled,
+                        path_complied,
+                        _extra_files=extra_files,
+                    )
+                except Exception as e:  # pylint: disable=W0703
+                    pass
             else:
                 torch.save(model, Path(args.model_dir) / (args.name + ".model"))
+                try:
+                    path_complied = Path(args.model_dir) / (
+                        args.name + "_compiled.model"
+                    )
+                    logging.info(f"Compiling model, saving metadata to {path_complied}")
+                    model_compiled = jit.compile(deepcopy(model))
+                    torch.jit.save(
+                        model_compiled,
+                        path_complied,
+                        _extra_files=extra_files,
+                    )
+                except Exception as e:  # pylint: disable=W0703
+                    pass
 
         if args.distributed:
             torch.distributed.barrier()

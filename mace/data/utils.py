@@ -117,7 +117,7 @@ def config_from_atoms(
 
     energy = atoms.info.get(energy_key, None)  # eV
     forces = atoms.arrays.get(forces_key, None)  # eV / Ang
-    stress = atoms.info.get(stress_key, None)  # eV / Ang
+    stress = atoms.info.get(stress_key, None)  # eV / Ang ^ 3
     virials = atoms.info.get(virials_key, None)
     dipole = atoms.info.get(dipole_key, None)  # Debye
     # Charges default to 0 instead of None if not found
@@ -202,7 +202,38 @@ def load_from_xyz(
     keep_isolated_atoms: bool = False,
 ) -> Tuple[Dict[int, float], Configurations]:
     atoms_list = ase.io.read(file_path, index=":")
-
+    if energy_key == "energy":
+        logging.info(
+            "Using energy_key 'energy' is unsafe, consider using a different key, rewriting energies to 'REF_energy'"
+        )
+        energy_key = "REF_energy"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_energy"] = atoms.get_potential_energy()
+            except Exception as e:  # pylint: disable=W0703
+                logging.warning(f"Failed to extract energy: {e}")
+                atoms.info["REF_energy"] = None
+    if forces_key == "forces":
+        logging.info(
+            "Using forces_key 'forces' is unsafe, consider using a different key, rewriting forces to 'REF_forces'"
+        )
+        forces_key = "REF_forces"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_forces"] = atoms.get_forces()
+            except Exception as e:  # pylint: disable=W0703
+                logging.warning(f"Failed to extract forces: {e}")
+                atoms.info["REF_forces"] = None
+    if stress_key == "stress":
+        logging.info(
+            "Using stress_key 'stress' is unsafe, consider using a different key, rewriting stress to 'REF_stress'"
+        )
+        stress_key = "REF_stress"
+        for atoms in atoms_list:
+            try:
+                atoms.info["REF_stress"] = atoms.get_stress()
+            except Exception as e:  # pylint: disable=W0703
+                atoms.info["REF_stress"] = None
     if not isinstance(atoms_list, list):
         atoms_list = [atoms_list]
 

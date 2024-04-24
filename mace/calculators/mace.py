@@ -15,10 +15,10 @@ from ase.calculators.calculator import Calculator, all_changes
 from ase.stress import full_3x3_to_voigt_6_stress
 
 from mace import data
-from mace.tools.compile import prepare
 from mace.modules.utils import extract_invariant
 from mace.tools import torch_geometric, torch_tools, utils
-from mace.tools.finetuning_utils import extract_load
+from mace.tools.compile import prepare
+from mace.tools.scripts_utils import extract_load
 
 
 def get_model_dtype(model: torch.nn.Module) -> torch.dtype:
