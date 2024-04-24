@@ -24,6 +24,7 @@
   - [Pretrained Foundation Models](#pretrained-foundation-models)
     - [MACE-MP: Materials Project Force Fields](#mace-mp-materials-project-force-fields)
       - [Example usage in ASE](#example-usage-in-ase)
+      - [MACE-freeze](#mace-freeze)
     - [MACE-OFF: Transferable Organic Force Fields](#mace-off-transferable-organic-force-fields)
       - [Example usage in ASE](#example-usage-in-ase-1)
   - [Development](#development)
@@ -320,6 +321,45 @@ mace_run_train \
 ```
 Other options are "medium" and "large", or the path to a foundation model. 
 If you want to finetune another model, the model will be loaded from the path provided `--foundation_model=$path_model`, but you will need to provide the full set of hyperparameters (hidden irreps, r_max, etc.) matching the model.
+
+
+<a id="mace-freeze"></a>
+### MACE-freeze
+
+Freeze the neural network layers for transfer learning or other applications. 
+**MACE-freeze can be used for both bespoke MACE models and MACE-MP foundation models.** 
+
+To install the MACE-freeze version of MACE, clone the mace-freeze/develop branch into your work folder:
+```sh
+git clone -b develop https://github.com/7radians/mace-freeze.git
+pip install ./mace
+```
+
+For bespoke MACE models, the initial model must have the same size as the transfer model, including the number of unique chemical elements present in the model. The elements do not have to be identical. 
+No such restriction applies to the MACE-MP models.
+
+Use the command line argument --freeze to freeze the layers from 1 to N inclusive. For example, this will freeze the first 5 layers:
+
+```sh
+--freeze=5
+```
+
+There is an option to freeze the last N layers. This will freeze the last 5 layers:
+
+```sh
+--freeze=-5
+```
+
+For finer tuning, parameter tensors can be frozen in each layer. The log file will contain the hierarchical list of the named parameters of the model.
+For example, to freeze these parameters, use:
+
+```sh
+--freeze_par=6 
+```
+--freeze_par takes integer values and works in the same manner as --freeze, freezing from 1 to N (if positive) or the last N (if negative).
+
+By default, mace-freeze assumes all layers are active, equating to --freeze=0 or --freeze_par=0. 
+--freeze and --freeze_par are not designed to be used in combination. If both arguments are stated, the model would take --freeze.
 
 ## Development
 
