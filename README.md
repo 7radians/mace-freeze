@@ -351,7 +351,7 @@ There is an option to freeze the last N layers. This will freeze the last 5 laye
 ```
 
 For finer tuning, parameter tensors can be frozen in each layer. The log file will contain the hierarchical list of the named parameters of the model.
-To freeze these parameters, use:
+For example, to freeze these parameters, use:
 
 ```sh
 --freeze_par=6 
