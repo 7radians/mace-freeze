@@ -24,9 +24,9 @@
   - [Pretrained Foundation Models](#pretrained-foundation-models)
     - [MACE-MP: Materials Project Force Fields](#mace-mp-materials-project-force-fields)
       - [Example usage in ASE](#example-usage-in-ase)
-      - [MACE-freeze](#mace-freeze)
     - [MACE-OFF: Transferable Organic Force Fields](#mace-off-transferable-organic-force-fields)
       - [Example usage in ASE](#example-usage-in-ase-1)
+  - [MACE-freeze](#mace-freeze)
   - [Development](#development)
   - [References](#references)
   - [Contact](#contact)
@@ -324,7 +324,7 @@ If you want to finetune another model, the model will be loaded from the path pr
 
 
 <a id="mace-freeze"></a>
-### MACE-freeze
+## MACE-freeze
 
 Freeze the neural network layers for transfer learning or other applications. 
 **MACE-freeze can be used for both bespoke MACE models and MACE-MP foundation models.** 
