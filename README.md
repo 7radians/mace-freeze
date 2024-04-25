@@ -332,7 +332,7 @@ Freeze the neural network layers for transfer learning or other applications.
 To install the MACE-freeze version of MACE, clone the mace-freeze/develop branch into your work folder:
 ```sh
 git clone -b mace-freeze https://github.com/7radians/mace-freeze.git
-pip install ./mace
+pip install ./mace-freeze
 ```
 
 For bespoke MACE models, the initial model must have the same size as the transfer model, including the number of unique chemical elements present in the model. The elements do not have to be identical. 
