@@ -331,7 +331,7 @@ Freeze the neural network layers for transfer learning or other applications.
 
 To install the MACE-freeze version of MACE, clone the mace-freeze/develop branch into your work folder:
 ```sh
-git clone -b develop https://github.com/7radians/mace-freeze.git
+git clone -b mace-freeze https://github.com/7radians/mace-freeze.git
 pip install ./mace
 ```
 
