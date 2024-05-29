@@ -4,6 +4,7 @@
 # This program is distributed under the MIT License (see MIT.md)
 ###########################################################################################
 
+import argparse
 import ast
 import glob
 import json
@@ -43,7 +44,17 @@ from mace.tools.utils import AtomicNumberTable
 
 
 def main() -> None:
+    """
+    This script runs the training/fine tuning for mace
+    """
     args = tools.build_default_arg_parser().parse_args()
+    run(args)
+
+
+def run(args: argparse.Namespace) -> None:
+    """
+    This script runs the training/fine tuning for mace
+    """
     tag = tools.get_tag(name=args.name, seed=args.seed)
     if args.distributed:
         try:
@@ -379,6 +390,7 @@ def main() -> None:
         )
         model_config_foundation["atomic_energies"] = atomic_energies
         args.model = "FoundationMACE"
+        model_config = model_config_foundation  # pylint
     else:
         logging.info("Building model")
         if args.num_channels is not None and args.max_L is not None:
@@ -625,8 +637,8 @@ def main() -> None:
                 args.start_swa = max(1, args.max_num_epochs // 4 * 3)
                 logging.info(f"Setting start swa to {args.start_swa}")
         if args.loss == "forces_only":
-            logging.info("Can not select swa with forces only loss.")
-        elif args.loss == "virials":
+            raise ValueError("Can not select swa with forces only loss.")
+        if args.loss == "virials":
             loss_fn_energy = modules.WeightedEnergyForcesVirialsLoss(
                 energy_weight=args.swa_energy_weight,
                 forces_weight=args.swa_forces_weight,
