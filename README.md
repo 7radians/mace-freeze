@@ -329,7 +329,7 @@ If you want to finetune another model, the model will be loaded from the path pr
 Freeze the neural network layers for transfer learning or other applications. 
 **MACE-freeze can be used for both bespoke MACE models and MACE-MP foundation models.** 
 
-To install the MACE-freeze version of MACE, clone the mace-freeze/develop branch into your work folder:
+To install the MACE-freeze version of MACE, clone the mace-freeze branch into your work folder:
 ```sh
 git clone -b mace-freeze https://github.com/7radians/mace-freeze.git
 pip install ./mace-freeze
