@@ -204,7 +204,7 @@ def train(
 
             #change
             # Checking gradients in the active layers
-            test_freeze = True
+            test_freeze = False
             if test_freeze == True:
                 logging.info("Check gradients")
                 for name, param in model.named_parameters():
