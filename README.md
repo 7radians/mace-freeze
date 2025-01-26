@@ -356,10 +356,11 @@ For example, to freeze these parameters, use:
 ```sh
 --freeze_par=6 
 ```
---freeze_par takes integer values and works in the same manner as --freeze, freezing from 1 to N (if positive) or the last N (if negative).
+`--freeze_par` takes integer values and works in the same manner as `--freeze`, freezing from 1 to N (if positive) or the last N (if negative).
 
-By default, mace-freeze assumes all layers are active, equating to --freeze=0 or --freeze_par=0. 
---freeze and --freeze_par are not designed to be used in combination. If both arguments are stated, the model would take --freeze.
+By default, mace-freeze assumes all layers are active, equating to `--freeze=0` or `--freeze_par=0`. 
+`--freeze` and `--freeze_par` are not designed to be used in combination. If both arguments are stated, the model would take `--freeze`.
+
 
 ## Development
 
