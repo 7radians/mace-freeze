@@ -31,7 +31,8 @@ from .utils import (
     compute_rel_rmse,
     compute_rmse,
 )
-
+# change
+from contextlib import contextmanager
 
 @dataclasses.dataclass
 class SWAContainer:
@@ -204,7 +205,7 @@ def train(
 
             #change
             # Checking gradients in the active layers
-            test_freeze = True
+            test_freeze = False
             if test_freeze == True:
                 logging.info("Check gradients")
                 for name, param in model.named_parameters():
@@ -353,6 +354,24 @@ def take_step(
     return loss, loss_dict
 
 
+
+# change: context manager to keep parameters frozen/active after evaluation
+
+@contextmanager
+def preserve_grad_state(model):
+    # save the original requires_grad state for all parameters
+    requires_grad_backup = {param: param.requires_grad for param in model.parameters()}
+    try:
+        # temporarily disable gradients for all parameters
+        for param in model.parameters():
+            param.requires_grad = False
+        yield  # perform evaluation here
+    finally:
+        # restore the original requires_grad states
+        for param, requires_grad in requires_grad_backup.items():
+            param.requires_grad = requires_grad
+
+
 def evaluate(
     model: torch.nn.Module,
     loss_fn: torch.nn.Module,
@@ -360,14 +379,10 @@ def evaluate(
     output_args: Dict[str, bool],
     device: torch.device,
 ) -> Tuple[float, Dict[str, Any]]:
-   # change
-   # for param in model.parameters():
-   #     param.requires_grad = False
-
     metrics = MACELoss(loss_fn=loss_fn).to(device)
 
     start_time = time.time()
-    with torch.no_grad():
+    with preserve_grad_state(model):  # temporarily disable parameter gradients
         for batch in data_loader:
             batch = batch.to(device)
             batch_dict = batch.to_dict()
@@ -384,11 +399,9 @@ def evaluate(
     aux["time"] = time.time() - start_time
     metrics.reset()
 
-    # change
-    #for param in model.parameters():
-    #    param.requires_grad = True
-
     return avg_loss, aux
+
+
 
 
 class MACELoss(Metric):
