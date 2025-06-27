@@ -14,6 +14,8 @@ from typing import List, Union
 
 os.environ["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
 
+import inspect
+
 import numpy as np
 import torch
 from ase.calculators.calculator import Calculator, all_changes
@@ -331,13 +333,21 @@ class MACECalculator(Calculator):
         )
         for i, model in enumerate(self.models):
             batch = self._clone_batch(batch_base)
-            out = model(
-                batch.to_dict(),
-                compute_stress=compute_stress,
-                training=self.use_compile,
-                compute_edge_forces=self.compute_atomic_stresses,
-                compute_atomic_stresses=self.compute_atomic_stresses,
-            )
+            kwargs = {
+                "compute_stress": compute_stress,
+                "training": self.use_compile,
+            }
+            try:
+                sig = inspect.signature(model.forward)
+                if "compute_edge_forces" in sig.parameters:
+                    kwargs["compute_edge_forces"] = self.compute_atomic_stresses
+                if "compute_atomic_stresses" in sig.parameters:
+                    kwargs["compute_atomic_stresses"] = self.compute_atomic_stresses
+            except (ValueError, TypeError):
+                pass
+
+            out = model(batch.to_dict(), **kwargs)
+
             if self.model_type in ["MACE", "EnergyDipoleMACE"]:
                 ret_tensors["energies"][i] = out["energy"].detach()
                 ret_tensors["node_energy"][i] = (out["node_energy"] - node_e0).detach()
