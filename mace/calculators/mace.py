@@ -412,19 +412,18 @@ class MACECalculator(Calculator):
                         * self.energy_units_to_eV
                         / self.length_units_to_A**3
                     )
-            if "atomic_stresses" in ret_tensors:
+            atomic_stresses_list = ret_tensors.get("atomic_stresses", [])
+            if len(atomic_stresses_list) > 0:
                 self.results["stresses"] = (
-                    torch.mean(torch.stack(ret_tensors["atomic_stresses"]), dim=0)
-                    .cpu()
-                    .numpy()
+                    torch.mean(torch.stack(atomic_stresses_list), dim=0).cpu().numpy()
                     * self.energy_units_to_eV
                     / self.length_units_to_A**3
                 )
-            if "atomic_virials" in ret_tensors:
+
+            atomic_virials_list = ret_tensors.get("atomic_virials", [])
+            if len(atomic_virials_list) > 0:
                 self.results["virials"] = (
-                    torch.mean(torch.stack(ret_tensors["atomic_virials"]), dim=0)
-                    .cpu()
-                    .numpy()
+                    torch.mean(torch.stack(atomic_virials_list), dim=0).cpu().numpy()
                     * self.energy_units_to_eV
                 )
         if self.model_type in ["DipoleMACE", "EnergyDipoleMACE"]:
