@@ -510,13 +510,34 @@ class MACECalculator(Calculator):
         batch = self._atoms_to_batch(atoms)
         descriptors = [model(batch.to_dict())["node_feats"] for model in self.models]
 
-        irreps_out = o3.Irreps(str(self.models[0].products[0].linear.irreps_out))
-        l_max = irreps_out.lmax
-        num_invariant_features = irreps_out.dim // (l_max + 1) ** 2
-        per_layer_features = [irreps_out.dim for _ in range(num_interactions)]
-        per_layer_features[-1] = (
-            num_invariant_features  # Equivariant features not created for the last layer
-        )
+        # ---- archer2 fix: infer irreps_out.dim, l_max, and num_invariant_features from the descriptor width ----
+        # descriptor shape: (N_atoms, D)
+        D = descriptors[0].shape[1]
+        Nint = num_interactions
+
+        # 1) compute integer sqrt bound m = ⌊√D⌋
+        m = 0
+        while (m + 1) * (m + 1) <= D:
+            m += 1
+
+        # 2) scan DOWN from m-1 to 0 to find the true l_max
+        l_max = None
+        num_invariant_features = None
+        for k in range(m - 1, -1, -1):
+            delta = (Nint - 1) * (k + 1) * (k + 1) + 1
+            if delta <= D and D % delta == 0:
+                l_max = k
+                num_invariant_features = D // delta
+                break
+
+        if l_max is None:
+            raise RuntimeError(f"Failed to infer l_max from D={D}, Nint={Nint}")
+
+        # Now build the per-layer feature counts:
+        #  - first Nint-1 layers each output num_invariant_features*(l_max+1)^2 channels (equivariant)
+        #  - last layer output only num_invariant_features channels 
+        irreps_dim = num_invariant_features * (l_max + 1) * (l_max + 1)
+        per_layer_features = [irreps_dim] * (Nint - 1) + [num_invariant_features]
 
         if invariants_only:
             descriptors = [
